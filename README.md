@@ -5,7 +5,7 @@
 
 A small Chrome and Edge extension that clicks **Jira's own Description Save button** after you stop editing for 1.5 seconds. No API keys, setup screens, subscriptions, or backend.
 
-**Preview release.** Jira's editor DOM can change. The extension deliberately does nothing when it cannot confidently identify the Description controls. See [validation and limitations](docs/TESTING.md) before relying on it for important edits.
+**Preview release, with live Chrome and Edge checks completed.** Jira's editor DOM can change. The extension deliberately does nothing when it cannot confidently identify the Description controls. See [validation and limitations](docs/TESTING.md) before relying on it for important edits.
 
 ![Autosave status beneath the Description editor on a synthetic demo page](docs/demo.png)
 
@@ -91,7 +91,7 @@ npm run test:browser
 npm run package
 ```
 
-The browser suite loads the real extension in an isolated Chromium profile against synthetic pages. It does not log into Jira. The package script uses an explicit file allowlist and emits a reproducible ZIP plus SHA-256 checksum under `dist/`.
+The browser suite loads the real extension in an isolated Chromium profile against synthetic pages. Set `JDA_BROWSER_CHANNEL=msedge` to run it against an installed Microsoft Edge instead (see [validation details](docs/TESTING.md#microsoft-edge-follow-up)). It does not log into Jira. The package script uses an explicit file allowlist and emits a reproducible ZIP plus SHA-256 checksum under `dist/`.
 
 | File | Purpose |
 | --- | --- |

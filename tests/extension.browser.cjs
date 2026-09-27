@@ -7,7 +7,7 @@ test.beforeAll(async () => {
   profile = fs.mkdtempSync(path.join(os.tmpdir(), 'jda-test-'));
   const extension = path.resolve('.');
   context = await chromium.launchPersistentContext(profile, {
-    channel: 'chromium', headless: true,
+    channel: process.env.JDA_BROWSER_CHANNEL || 'chromium', headless: true,
     args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
   });
   await context.route('https://fixture.atlassian.net/**', route => route.fulfill({

@@ -10,7 +10,7 @@ Passing fixture tests proves the event/state handling and content-script packagi
 
 ## Live Jira validation — 27 September 2026
 
-Tested on a user-authorised disposable Jira Cloud issue in an existing Chrome session. The exact runtime source was injected temporarily into an isolated browser world; the packaged extension was separately tested in Playwright Chromium. No live account data is included in this repository.
+Tested on a user-authorised disposable Jira Cloud issue in existing Chrome and Microsoft Edge sessions. The exact v0.1.0 runtime source was injected temporarily into isolated browser worlds; extension loading and packaging were separately tested in isolated Playwright Chromium and Microsoft Edge profiles. No live account data is included in this repository.
 
 Confirmed on live Jira:
 
@@ -26,7 +26,21 @@ Confirmed on live Jira:
 
 Live inspection found two differences from the initial synthetic model: edit mode replaces the read-view Description test ID, and Jira keeps an empty popup portal mounted. Both have regression coverage. A manual-save teardown mutation initially caused a false failure status; ending the preceding mutation window when saving fixes it, with tests for both teardown and genuine newer edits. Hidden attachment inputs are allowed without broadening discovery to custom fields.
 
-Microsoft Edge, other Jira rollouts/languages, every rich-content type, and live network-failure/slow-save conditions have **not** been exhaustively validated. Failure, concurrency and navigation boundaries are additionally covered by synthetic tests. Treat this as a preview.
+Other Jira rollouts/languages, every rich-content type, and live network-failure/slow-save conditions have **not** been exhaustively validated. Failure, concurrency and navigation boundaries are additionally covered by synthetic tests. Treat this as a preview.
+
+### Microsoft Edge follow-up
+
+Tested Microsoft Edge **154.0.4258.37 on macOS** on the same date. All nine browser tests passed with the extension loaded into an isolated Edge profile, including native errors, Cancel, formatting popups, SPA replacement and manual-save teardown. Run this suite on macOS/Linux with Edge installed:
+
+```sh
+JDA_BROWSER_CHANNEL=msedge npm run test:browser
+```
+
+For PowerShell, set `$env:JDA_BROWSER_CHANNEL = 'msedge'` before `npm run test:browser`.
+
+Live Edge checks also passed for direct issue URLs, board `selectedIssue` URLs, persistence after reload, Cancel, bold-only edits, link popups, manual Save, Cmd+Enter and board close/reopen without reinjection. Typed edits triggered one native Save approximately 1.51 seconds after the final input. Clicking outside triggered Save in under 0.5 seconds. The original Description and formatting were restored, and full navigation removed the temporary test code. Jira Autosave was not permanently installed into the user's profile.
+
+The tested runtime matches the existing v0.1.0 release; no extension code changes were needed for Edge.
 
 ## Full acceptance checklist
 
@@ -44,7 +58,7 @@ Use only an explicitly disposable Jira issue. Test the final packaged version, i
 - [ ] Switch issues within the board without a full reload; new editors work.
 - [ ] Network/save failure shows Save failed, leaves Jira's error visible and never retries in a loop.
 - [ ] Edits during a slow save are never reported as confirmed without a reliable UI completion signal.
-- [ ] Repeat core save, Cancel and formatting checks in Microsoft Edge.
+- [x] Repeat core save, Cancel and formatting checks in Microsoft Edge.
 
 ## Selector maintenance
 
