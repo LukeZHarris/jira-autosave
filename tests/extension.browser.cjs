@@ -81,3 +81,15 @@ test('capture a synthetic README demo', async () => {
   await page.screenshot({ path: 'docs/demo.png' });
   await page.close();
 });
+for (const mode of ['button', 'shortcut']) {
+  test(`manual ${mode} save survives editor teardown without a false failure`, async () => {
+    const page = await pageAt('/browse/DEMO-1');
+    const editor = page.getByRole('textbox', { name: 'Description' });
+    await editor.fill('Manual save regression');
+    if (mode === 'button') await page.getByRole('button', { name: 'Save', exact: true }).click();
+    else await editor.press('ControlOrMeta+Enter');
+    await expect(page.locator('.jda-status')).toHaveText('Saved');
+    expect(await page.evaluate(() => window.saveCount)).toBe(1);
+    await page.close();
+  });
+}

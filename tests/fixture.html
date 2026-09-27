@@ -29,10 +29,13 @@ function edit() {
     const snapshot = root.querySelector('[contenteditable]').innerHTML;
     setTimeout(() => {
       if (window.failSave) root.insertAdjacentHTML('beforeend', '<div role="alert">Could not save</div>');
-      else { saved = snapshot; view(); }
+      else { saved = snapshot; root.querySelector('[contenteditable]').replaceChildren(); view(); }
     }, window.saveDelay);
   };
   document.querySelector('#cancel').onclick = view;
+  root.querySelector('[contenteditable]').addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') document.querySelector('#save').click();
+  });
   document.querySelector('#bold').onclick = () => {
     const p = root.querySelector('[contenteditable] p');
     if (p) p.innerHTML = '<strong>' + p.innerHTML + '</strong>';

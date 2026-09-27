@@ -144,6 +144,10 @@
     beginSave() {
       if (this.saving || !this.dirty) return;
       clearTimeout(this.timer);
+      // Jira dismantles editor content during Save. End the preceding edit's
+      // mutation window so teardown is not mistaken for newer user input.
+      this.observer.takeRecords();
+      this.intentUntil = 0;
       this.saving = true;
       this.failed = false;
       this.sentVersion = this.version;

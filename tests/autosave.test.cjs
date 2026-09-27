@@ -160,3 +160,17 @@ test('buttons embedded in Description content are not read or mistaken for contr
   Object.defineProperty(embedded, 'textContent', { get() { throw new Error('Description content must not be read'); } });
   s.q('[contenteditable]').append(embedded); s.edit(); await s.tick(1500); assert.equal(s.saves(), 1);
 });
+test('manual save teardown is not mistaken for edits made during the save', async t => {
+  const s = setup(t);
+  s.event(s.q('[contenteditable]'), 'beforeinput'); s.edit();
+  s.event(s.q('#save'), 'pointerdown'); s.q('#save').click();
+  s.q('[contenteditable]').replaceChildren();
+  s.q('section').innerHTML = '<h2>Description</h2><div>Rendered</div>';
+  await s.tick(250); assert.equal(s.status(), 'Saved'); assert.equal(s.saves(), 1);
+});
+test('new input during a manual save is still treated as unconfirmed', async t => {
+  const s = setup(t); s.edit(); s.q('#save').click();
+  s.event(s.q('[contenteditable]'), 'beforeinput'); s.edit();
+  s.q('section').innerHTML = '<h2>Description</h2><div>Rendered</div>';
+  await s.tick(250); assert.equal(s.status(), 'Save failed'); assert.equal(s.saves(), 1);
+});

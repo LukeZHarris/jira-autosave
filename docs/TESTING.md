@@ -20,8 +20,11 @@ Confirmed on live Jira:
 - Link popup: pending changes remained unsaved while open; dismissing the popup allowed the save to complete.
 - Formatting-only edit: applying bold triggered a single save and rendered bold content.
 - Board SPA close/reopen: editor discovery continued without reloading or reinjecting the script.
+- Manual Save and Cmd+Enter: saved correctly without an automatic retry, and displayed Saved.
+- Immediate departure: clicking the issue heading triggered a native Save before the idle timer.
+- The original Description was restored and confirmed after reload; all temporary injected code was removed.
 
-Live inspection found two differences from the initial synthetic model: edit mode replaces the read-view Description test ID, and Jira keeps an empty popup portal mounted. Both have regression coverage. Hidden attachment inputs are allowed without broadening discovery to custom fields.
+Live inspection found two differences from the initial synthetic model: edit mode replaces the read-view Description test ID, and Jira keeps an empty popup portal mounted. Both have regression coverage. A manual-save teardown mutation initially caused a false failure status; ending the preceding mutation window when saving fixes it, with tests for both teardown and genuine newer edits. Hidden attachment inputs are allowed without broadening discovery to custom fields.
 
 Microsoft Edge, other Jira rollouts/languages, every rich-content type, and live network-failure/slow-save conditions have **not** been exhaustively validated. Failure, concurrency and navigation boundaries are additionally covered by synthetic tests. Treat this as a preview.
 
@@ -29,15 +32,15 @@ Microsoft Edge, other Jira rollouts/languages, every rich-content type, and live
 
 Use only an explicitly disposable Jira issue. Test the final packaged version, in the browser profile where it is installed. Do not commit live Jira screenshots, browser profiles or customer DOM dumps.
 
-- [ ] Chrome: open `/browse/KEY`, edit Description, pause, observe Unsaved → Saving → Saved, reload and confirm persistence.
-- [ ] Board: open a URL with `?selectedIssue=KEY`, repeat the save and reload check.
-- [ ] Continue typing beyond 1.5 seconds; save only after the final pause.
-- [ ] Reopen Description after saving; a second edit saves once.
-- [ ] Manual Save and Ctrl/Cmd+Enter do not cause a duplicate automatic save.
-- [ ] Cancel before the timer fires; reload and confirm the draft was not saved.
+- [x] Chrome: open `/browse/KEY`, edit Description, pause, observe Unsaved → Saving → Saved, reload and confirm persistence.
+- [x] Board: open a URL with `?selectedIssue=KEY`, repeat the save and reload check.
+- [x] Continue typing beyond 1.5 seconds; save only after the final pause.
+- [x] Reopen Description after saving; a second edit saves once.
+- [x] Manual Save and Ctrl/Cmd+Enter do not cause a duplicate automatic save.
+- [x] Cancel before the timer fires; reload and confirm the draft was not saved.
 - [ ] Bold, headings, lists, links, code, mentions and Jira rich content still behave normally.
-- [ ] Keep a link or formatting dialog open for several seconds; no premature save.
-- [ ] Click away immediately after typing; native Save is attempted.
+- [x] Keep a link or formatting dialog open for several seconds; no premature save.
+- [x] Click away immediately after typing; native Save is attempted.
 - [ ] Switch issues within the board without a full reload; new editors work.
 - [ ] Network/save failure shows Save failed, leaves Jira's error visible and never retries in a loop.
 - [ ] Edits during a slow save are never reported as confirmed without a reliable UI completion signal.
