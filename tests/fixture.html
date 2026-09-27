@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Jira Autosave · synthetic test fixture</title>
+<style>
+* { box-sizing: border-box; } body { margin:0; padding:64px; color:#172b4d; background:#f7f8fa; font:16px/1.5 system-ui; }
+main { max-width:820px; margin:auto; background:white; border:1px solid #dfe1e6; border-radius:16px; padding:40px; }
+small { color:#626f86; } h1 { margin:12px 0 32px; font-size:30px; } h2 { font-size:16px; margin-top:0; }
+[contenteditable] { min-height:140px; padding:16px; border:2px solid #0c66e4; border-radius:0 0 6px 6px; outline:none; }
+[role=toolbar] { border:1px solid #dfe1e6; padding:8px; background:#f7f8fa; border-radius:6px 6px 0 0; }
+button { border:0; padding:8px 14px; margin:8px 8px 8px 0; border-radius:4px; background:#f1f2f4; color:#172b4d; cursor:pointer; }
+#save { background:#0c66e4; color:white; } [role=toolbar] button { margin:0; }
+a { color:#0c66e4; } .footer { margin-top:28px; font-size:13px; color:#626f86; }
+</style></head><body><main><small>JIRA DESCRIPTION AUTOSAVE · DEMO</small><h1>A little less clicking.</h1>
+<section data-testid="issue.views.field.rich-text.description"><h2>Description</h2><div id="view"><p>Click Edit description to try the extension.</p><button id="edit">Edit description</button></div></section>
+<p class="footer">Synthetic test page. No Jira data or network saves.</p><a href="/browse/DEMO-2">Next issue</a></main>
+<script>
+window.saveCount = 0;
+window.saveDelay = 100;
+window.failSave = false;
+const root = document.querySelector('section');
+let saved = '<p>A small improvement to an everyday task.</p>';
+function view() {
+  root.innerHTML = '<h2>Description</h2><div id="view">' + saved + '</div><button id="edit">Edit description</button>';
+  document.querySelector('#edit').onclick = edit;
+}
+function edit() {
+  root.innerHTML = '<h2>Description</h2><div role="toolbar"><button id="bold">Bold</button><button id="link">Link</button></div><div role="textbox" aria-label="Description" class="ProseMirror" contenteditable="true">' + saved + '</div><button id="save">Save</button><button id="cancel">Cancel</button>';
+  document.querySelector('#save').onclick = () => {
+    window.saveCount++;
+    const snapshot = root.querySelector('[contenteditable]').innerHTML;
+    setTimeout(() => {
+      if (window.failSave) root.insertAdjacentHTML('beforeend', '<div role="alert">Could not save</div>');
+      else { saved = snapshot; view(); }
+    }, window.saveDelay);
+  };
+  document.querySelector('#cancel').onclick = view;
+  document.querySelector('#bold').onclick = () => {
+    const p = root.querySelector('[contenteditable] p');
+    if (p) p.innerHTML = '<strong>' + p.innerHTML + '</strong>';
+  };
+  document.querySelector('#link').onclick = () => {
+    const dialog = document.createElement('div'); dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-label', 'Insert link');
+    dialog.innerHTML = '<input aria-label="Link URL"><button>Done</button>';
+    document.body.append(dialog); dialog.querySelector('button').onclick = () => dialog.remove();
+    dialog.querySelector('input').focus();
+  };
+  root.querySelector('[contenteditable]').focus();
+}
+view();
+</script></body></html>

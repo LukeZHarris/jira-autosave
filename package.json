@@ -1,0 +1,21 @@
+{
+  "name": "jira-description-autosave",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Conservative, local-only Description autosave for Jira Cloud",
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "check": "node --check content.js && node scripts/check.cjs",
+    "package": "python3 scripts/package.py",
+    "test:browser": "playwright test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@sinonjs/fake-timers": "^15.4.0",
+    "jsdom": "^30.1.1"
+  }
+}
