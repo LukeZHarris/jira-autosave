@@ -106,6 +106,8 @@ Selectors live near the top of `content.js`; timing defaults are in `CONFIG`. Th
 
 ## Report a problem
 
-[Open an issue](https://github.com/lukezharris/jira-autosave/issues) with your browser version, Jira interface language, issue view type, and the steps to reproduce. Mention whether you saw an autosave status. Please remove issue content, customer information, tokens, and private URLs from screenshots or DOM snippets.
+[Report a reproducible bug](https://github.com/lukezharris/jira-autosave/issues/new/choose) using the issue form. Please remove issue content, customer information, tokens, and private URLs from screenshots or DOM snippets.
+
+This is a maintainer-developed project shared for others to use. **External pull requests are not accepted; pull requests are disabled.** First-hand bug reports are welcome. Unverified AI-generated reports, bulk audits, promotional posts, and unsolicited contribution requests may be closed without discussion. See the [contribution and reporting policy](CONTRIBUTING.md).
 
 MIT licensed. Independent project; not affiliated with or endorsed by Atlassian, Google, or Microsoft.

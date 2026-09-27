@@ -1,0 +1,54 @@
+name: Reproducible bug
+description: Report a problem you have personally reproduced with Jira Description Autosave.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please read the [reporting policy](https://github.com/LukeZHarris/jira-autosave/blob/main/CONTRIBUTING.md) first. External contributions are not accepted. Keep customer information, credentials, Jira content, and private URLs out of this public report.
+  - type: input
+    id: versions
+    attributes:
+      label: Extension and browser versions
+      placeholder: "Extension 0.1.0; Edge 154; macOS"
+    validations:
+      required: true
+  - type: dropdown
+    id: view
+    attributes:
+      label: Jira view
+      options:
+        - Direct issue page (/browse/...)
+        - Board with an open issue (selectedIssue=...)
+        - Another view (describe below)
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include your Jira interface language and the editing or formatting actions involved. Use a disposable issue and do not include its private URL or content.
+      placeholder: |
+        Jira language: English
+        1. Open a disposable issue...
+        2. Edit Description...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Expected and actual behaviour
+      description: What should have happened, what actually happened, and which autosave status (if any) appeared? Does native Save work?
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked existing issues and the documented scope and limitations.
+          required: true
+        - label: I personally reproduced this problem and verified every claim, including any AI-assisted text.
+          required: true
+        - label: I removed private information and am reporting a bug, not submitting a patch or promotional content.
+          required: true
