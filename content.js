@@ -20,8 +20,9 @@
   });
   const controllers = new Map();
   const discarded = new WeakSet();
-  const visible = el => el.isConnected && !el.closest('[hidden], [aria-hidden="true"]') && el.getClientRects().length > 0;
-  const buttons = root => [...root.querySelectorAll(SELECTORS.button)].filter(visible);
+  const visible = el => el.isConnected && !el.closest('[hidden], [aria-hidden="true"]') &&
+    getComputedStyle(el).visibility !== 'hidden' && [...el.getClientRects()].some(rect => rect.width > 0 && rect.height > 0);
+  const buttons = root => [...root.querySelectorAll(SELECTORS.button)].filter(el => visible(el) && !el.closest(SELECTORS.editor));
   // Read control labels only; never read/serialize the Description editor.
   const label = el => (el.getAttribute('aria-label') || el.textContent || '').trim().toLowerCase();
   function controls(root) {
@@ -73,7 +74,10 @@
       listen(this.editor, 'compositionstart', () => { this.composing = true; clearTimeout(this.timer); });
       listen(this.editor, 'compositionend', () => { this.composing = false; this.schedule(); });
       listen(root, 'keydown', event => {
-        this.intentUntil = Date.now() + 750;
+        const shortcut = event.ctrlKey || event.metaKey;
+        if ((!shortcut && !event.altKey && event.key.length === 1) ||
+            ['Backspace', 'Delete', 'Enter'].includes(event.key) ||
+            (shortcut && ['b', 'i', 'u', 'z', 'y', 'x', 'v'].includes(event.key.toLowerCase()))) this.intentUntil = Date.now() + 750;
         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !event.isComposing) this.beginSave();
       }, true);
       listen(document, 'pointerdown', event => this.pointer(event), true);
@@ -85,7 +89,7 @@
       // Navigation API gives an early chance without intercepting Jira's router.
       if (window.navigation) listen(window.navigation, 'navigate', () => this.save());
       this.observer = new MutationObserver(records => {
-        if (Date.now() <= this.intentUntil && records.some(contentMutation)) this.changed();
+        if (Date.now() < this.intentUntil && records.some(contentMutation)) this.changed();
       });
       this.observer.observe(this.editor, { subtree: true, childList: true, characterData: true, attributes: true });
     }
@@ -113,9 +117,11 @@
       if (!pair) return;
       if (pair.cancel.contains(event.target)) { this.cancel(); return; }
       if (this.root.contains(event.target)) {
-        this.intentUntil = Date.now() + 750;
         // Pause while selecting formatting controls (including portalled UI).
-        if (!this.editor.contains(event.target)) clearTimeout(this.timer);
+        if (!this.editor.contains(event.target)) {
+          this.intentUntil = Date.now() + 750;
+          clearTimeout(this.timer);
+        }
         return;
       }
       if (!event.target.closest(SELECTORS.overlay) && !overlayOpen(this.root)) this.save();
@@ -126,7 +132,7 @@
       if (pair.cancel.contains(event.target)) { this.cancel(); return; }
       if (pair.save.contains(event.target) && enabled(pair.save)) { this.beginSave(); return; }
       if (this.root.contains(event.target) || event.target.closest(SELECTORS.overlay)) {
-        this.intentUntil = Date.now() + 750;
+        if (!this.editor.contains(event.target)) this.intentUntil = Date.now() + 750;
         this.schedule();
       } else if (!overlayOpen(this.root)) this.save();
     }

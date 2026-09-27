@@ -8,7 +8,7 @@ const markup = `<section data-testid="issue.views.field.rich-text.description"><
 function setup(t, html = markup) {
   const dom = new JSDOM(`<body>${html}<a id="away" href="/browse/TEST-2">Next issue</a></body>`, { url: 'https://example.atlassian.net/browse/TEST-1', runScripts: 'outside-only' });
   const w = dom.window;
-  w.HTMLElement.prototype.getClientRects = function () { return this.hidden ? [] : [{}]; };
+  w.HTMLElement.prototype.getClientRects = function () { return this.hidden ? [] : [{ width: 100, height: 30 }]; };
   const clock = FakeTimers.withGlobal(w).install({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
   w.eval(source);
   const q = selector => w.document.querySelector(selector);
@@ -140,4 +140,23 @@ test('live Jira heading identifies edit-mode wrapper and permits hidden attachme
 test('Description heading cannot match an adjacent custom field editor', async t => {
   const s = setup(t, `<div><div><h2 data-testid="issue.views.issue-base.common.description.label">Description</h2></div><div><h2 data-testid="issue.views.issue-base.common.customfield_1.label">Other field</h2><div data-testid="issue.views.field.rich-text.editor-container"><div role="textbox" contenteditable="true"></div><button id="save">Save</button><button id="cancel">Cancel</button></div></div></div>`);
   s.edit(); await s.tick(3000); assert.equal(s.saves(), 0); assert.equal(s.q('.jda-status'), null);
+});
+test('empty Jira popup portal does not suspend autosave', async t => {
+  const s = setup(t); const portal = s.w.document.createElement('div'); portal.dataset.editorPopup = 'true';
+  portal.getClientRects = () => [{ width: 0, height: 0 }]; s.w.document.body.append(portal);
+  s.edit(); await s.tick(1500); assert.equal(s.saves(), 1);
+});
+test('selection-only cursor and pointer activity cannot arm mutation saves', async t => {
+  const s = setup(t);
+  s.q('[contenteditable]').dispatchEvent(new s.w.KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }));
+  s.event(s.q('[contenteditable]'), 'pointerdown'); s.q('[contenteditable]').click();
+  const decoration = s.w.document.createTextNode('decoration');
+  s.q('[contenteditable]').append(decoration);
+  await s.tick(3000); assert.equal(s.saves(), 0);
+});
+test('buttons embedded in Description content are not read or mistaken for controls', async t => {
+  const s = setup(t);
+  const embedded = s.w.document.createElement('span'); embedded.setAttribute('role', 'button');
+  Object.defineProperty(embedded, 'textContent', { get() { throw new Error('Description content must not be read'); } });
+  s.q('[contenteditable]').append(embedded); s.edit(); await s.tick(1500); assert.equal(s.saves(), 1);
 });

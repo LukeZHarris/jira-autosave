@@ -10,8 +10,8 @@ button { border:0; padding:8px 14px; margin:8px 8px 8px 0; border-radius:4px; ba
 #save { background:#0c66e4; color:white; } [role=toolbar] button { margin:0; }
 a { color:#0c66e4; } .footer { margin-top:28px; font-size:13px; color:#626f86; }
 </style></head><body><main><small>JIRA DESCRIPTION AUTOSAVE · DEMO</small><h1>A little less clicking.</h1>
-<section data-testid="issue.views.field.rich-text.description"><h2>Description</h2><div id="view"><p>Click Edit description to try the extension.</p><button id="edit">Edit description</button></div></section>
-<p class="footer">Synthetic test page. No Jira data or network saves.</p><a href="/browse/DEMO-2">Next issue</a></main>
+<section><h2 data-testid="issue.views.issue-base.common.description.label">Description</h2><div id="view"><p>Click Edit description to try the extension.</p><button id="edit">Edit description</button></div></section>
+<p class="footer">Synthetic test page. No Jira data or network saves.</p><a href="/browse/DEMO-2">Next issue</a></main><div data-editor-popup="true" style="width:0;height:0"></div>
 <script>
 window.saveCount = 0;
 window.saveDelay = 100;
@@ -19,11 +19,11 @@ window.failSave = false;
 const root = document.querySelector('section');
 let saved = '<p>A small improvement to an everyday task.</p>';
 function view() {
-  root.innerHTML = '<h2>Description</h2><div id="view">' + saved + '</div><button id="edit">Edit description</button>';
+  root.innerHTML = '<h2 data-testid="issue.views.issue-base.common.description.label">Description</h2><div data-testid="issue.views.field.rich-text.description" id="view">' + saved + '</div><button id="edit">Edit description</button>';
   document.querySelector('#edit').onclick = edit;
 }
 function edit() {
-  root.innerHTML = '<h2>Description</h2><div role="toolbar"><button id="bold">Bold</button><button id="link">Link</button></div><div role="textbox" aria-label="Description" class="ProseMirror" contenteditable="true">' + saved + '</div><button id="save">Save</button><button id="cancel">Cancel</button>';
+  root.innerHTML = '<h2 data-testid="issue.views.issue-base.common.description.label">Description</h2><div data-testid="issue.views.field.rich-text.editor-container"><input type="file" hidden><div role="toolbar"><button id="bold">Bold</button><button id="link">Link</button></div><div role="textbox" aria-label="Description" class="ProseMirror" contenteditable="true">' + saved + '</div><button id="save">Save</button><button id="cancel">Cancel</button></div>';
   document.querySelector('#save').onclick = () => {
     window.saveCount++;
     const snapshot = root.querySelector('[contenteditable]').innerHTML;

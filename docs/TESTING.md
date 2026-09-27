@@ -8,7 +8,24 @@
 
 Passing fixture tests proves the event/state handling and content-script packaging. It does not prove compatibility with every current Jira rollout or persistence to a real Jira server.
 
-## Live acceptance checklist
+## Live Jira validation — 27 September 2026
+
+Tested on a user-authorised disposable Jira Cloud issue in an existing Chrome session. The exact runtime source was injected temporarily into an isolated browser world; the packaged extension was separately tested in Playwright Chromium. No live account data is included in this repository.
+
+Confirmed on live Jira:
+
+- Direct issue URL (including query parameters): typing produced Unsaved → Saving → Saved, one native Save click, and text persisted after loading the board view.
+- Board URL with `selectedIssue`: the same status sequence and saved text persisted after a complete reload.
+- Cancel with a pending debounce: no native Save click; discarded text absent from the rendered Description.
+- Link popup: pending changes remained unsaved while open; dismissing the popup allowed the save to complete.
+- Formatting-only edit: applying bold triggered a single save and rendered bold content.
+- Board SPA close/reopen: editor discovery continued without reloading or reinjecting the script.
+
+Live inspection found two differences from the initial synthetic model: edit mode replaces the read-view Description test ID, and Jira keeps an empty popup portal mounted. Both have regression coverage. Hidden attachment inputs are allowed without broadening discovery to custom fields.
+
+Microsoft Edge, other Jira rollouts/languages, every rich-content type, and live network-failure/slow-save conditions have **not** been exhaustively validated. Failure, concurrency and navigation boundaries are additionally covered by synthetic tests. Treat this as a preview.
+
+## Full acceptance checklist
 
 Use only an explicitly disposable Jira issue. Test the final packaged version, in the browser profile where it is installed. Do not commit live Jira screenshots, browser profiles or customer DOM dumps.
 
