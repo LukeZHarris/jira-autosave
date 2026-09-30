@@ -34,7 +34,7 @@ When the Jira Description field enters edit mode:
 2. Detect meaningful user edits to the Description.
 3. Mark the editor as having unsaved changes.
 4. Display a small autosave status indicator.
-5. After approximately 1.5 seconds of inactivity, trigger Jira’s existing Description Save button.
+5. After 10 seconds without keystrokes, show a non-modal “Autosave in 10s” countdown with Keep editing. After another 10 seconds, dismiss it and trigger Jira’s existing Description Save button.
 6. Display Saving….
 7. Detect when Jira finishes leaving edit mode or otherwise confirms that the save completed.
 8. Display Saved briefly, then hide or reduce the prominence of the indicator.
@@ -65,9 +65,9 @@ Suggested behaviour:
 * Saved appears after save completion and remains visible for around 1–2 seconds.
 * Save failed remains visible until another save succeeds or the editor is closed.
 
-Keep the visual design subtle and consistent with Jira.
+Keep the save-status label subtle. Make the countdown conspicuous: a compact floating card using Jira’s neutral overlay surface, border, shadow and text colours, with a larger countdown and a prominent Jira-blue Keep editing button, and “Remind me after 30 seconds” underneath.
 
-The indicator must not obscure the editor, toolbar, Save button, Cancel button, or Jira notifications.
+Position the countdown below the text caret, or above it when space is limited. Keep it within the visible viewport, including after scrolling or resizing. If the caret is offscreen or its geometry is unavailable, use the centre of the visible window. The card may overlap the editor, but must never take keyboard focus on appearance. It must escape clipping by Jira scrolling containers. Use caret geometry only; do not read text or insert markers into the editor.
 
 Save strategy
 
@@ -105,19 +105,24 @@ Debouncing
 
 Default idle delay:
 
-1500 ms
+10000 ms
 
-Every meaningful edit resets the timer.
+Every keystroke or meaningful edit resets the timer and dismisses an active countdown. Keystrokes alone do not mark an unchanged editor dirty. Cancelling the countdown keeps the changes and sets the idle delay to 30 seconds for the rest of that editing session; each subsequent countdown still lasts 10 seconds. A newly opened editor returns to the default idle delay.
 
 Example:
 
 User types
 → dirty
-→ 1.5 second timer starts
-User types again after 900 ms
+→ 10-second idle timer starts
+User types again
 → timer resets
-No input for 1.5 seconds
-→ save
+No input for 10 seconds
+→ “Autosave in 10s” countdown appears
+No input or cancellation for another 10 seconds
+→ dismiss countdown and save
+
+Keep editing on the countdown
+→ keep changes and wait 30 idle seconds before showing the next 10-second countdown
 
 Only one save may be in progress at a time.
 
@@ -168,7 +173,7 @@ A subsequent edit may allow the normal debounce/save process to try again.
 
 Navigation and blur behaviour
 
-When the editor contains unsaved changes and the user interacts outside it, attempt to save immediately rather than waiting for the debounce delay.
+When the editor contains unsaved changes and the user interacts outside it, attempt to save immediately rather than waiting for the idle delay or countdown. The countdown is part of the editing UI: clicking or focusing it must never trigger a departure save.
 
 However:
 
@@ -183,7 +188,7 @@ Cancel behaviour
 If the user explicitly clicks Jira’s native Cancel control:
 
 * do not autosave;
-* cancel pending debounce timers;
+* cancel pending idle/countdown timers and dismiss the countdown;
 * clear extension dirty state for that editor;
 * allow Jira’s native cancellation behaviour to proceed normally.
 
@@ -226,7 +231,7 @@ For v1, avoid building an options page unless implementation is trivial.
 Hard-coded defaults are acceptable:
 
 Autosave enabled: true
-Idle delay: 1500 ms
+Idle delay: 10000 ms
 Save on genuine editor departure: true
 
 Structure the code so the delay can easily become configurable later.
@@ -366,7 +371,7 @@ Normal typing
 3. Type some text.
 4. Stop typing.
 5. Unsaved changes… appears.
-6. Approximately 1.5 seconds later, Jira’s native Save is triggered.
+6. After 10 idle seconds, a cancellable 10-second countdown appears without taking focus. At zero, it disappears and Jira’s native Save is triggered.
 7. Status changes to Saving….
 8. Jira completes the save.
 9. Status changes to Saved.
@@ -376,7 +381,7 @@ Continuous typing
 
 Continuous typing must not cause repeated saves.
 
-Saving occurs only once the user pauses for the debounce interval.
+Idle saving occurs only once the user pauses for the idle interval and the full countdown. Cancelling the countdown must retain changes and give 30 idle seconds before the next countdown, including after further typing.
 
 Edit after save
 
@@ -441,7 +446,7 @@ Suggested implementation order
 1. Detect Jira Description edit mode reliably.
 2. Identify the correct native Save and Cancel buttons.
 3. Detect meaningful edits.
-4. Implement dirty state and 1.5-second debounce.
+4. Implement dirty state, 10-second idle delay, cancellable 10-second countdown, and 30-second idle delay after cancellation.
 5. Trigger native Save.
 6. Detect successful completion.
 7. Add the status indicator.
@@ -462,6 +467,7 @@ The ideal interaction is:
 Edit Description
 → type normally
 → pause
+→ cancellable countdown
 → Saved
 
 The user should quickly stop thinking about the Save button at all.

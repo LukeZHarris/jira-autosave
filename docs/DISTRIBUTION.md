@@ -4,7 +4,7 @@
 
 Release assets contain only `manifest.json`, the content script and stylesheet, four icons, the license and privacy policy. Users extract the ZIP and use **Load unpacked**. They keep the extracted folder and update it manually. Source downloads work too; no compilation is required.
 
-Generate a release with `npm run package`. The adjacent `.sha256` file lets users verify their download, for example with `shasum -a 256 jira-description-autosave-0.1.0.zip` on macOS. The checksum is an integrity check, not a signature or security audit.
+Generate a release with `npm run package`. The adjacent `.sha256` file lets users verify their download, for example with `shasum -a 256 jira-description-autosave-0.3.2.zip` on macOS. The checksum is an integrity check, not a signature or security audit.
 
 ## Chrome Web Store later
 

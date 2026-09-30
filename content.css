@@ -8,7 +8,44 @@
 .jda-status[hidden] { display: none; }
 .jda-status[data-state="saved"] { color: var(--ds-text-success, #216e4e); }
 .jda-status[data-state="failed"] { color: var(--ds-text-danger, #ae2a19); }
+.jda-countdown {
+  box-sizing: border-box;
+  position: fixed;
+  inset: auto;
+  z-index: 2147483647;
+  display: grid;
+  gap: 10px;
+  width: 280px;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  border: 1px solid var(--ds-border, #dfe1e6);
+  border-radius: 8px;
+  background: var(--ds-surface-overlay, #fff);
+  color: var(--ds-text, #172b4d);
+  box-shadow: var(--ds-shadow-overlay, 0 8px 28px #091e4240, 0 2px 6px #091e4226);
+  font: 400 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.jda-countdown[hidden] { display: none; }
+.jda-countdown [role="status"] { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.jda-countdown button {
+  margin: 0;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--ds-background-brand-bold, #0c66e4);
+  color: var(--ds-text-inverse, #fff);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.jda-countdown button:hover { background: var(--ds-background-brand-bold-hovered, #0055cc); }
+.jda-countdown button:active { background: var(--ds-background-brand-bold-pressed, #09326c); }
+.jda-countdown small { color: var(--ds-text-subtle, #44546f); font-size: 12px; text-align: center; }
+.jda-countdown button:focus-visible { outline: 3px solid var(--ds-border-focused, #388bff); outline-offset: 3px; }
 @media (prefers-color-scheme: dark) {
+  .jda-countdown { background: var(--ds-surface-overlay, #282e33); color: var(--ds-text, #b6c2cf); border-color: var(--ds-border, #454f59); }
+  .jda-countdown small { color: var(--ds-text-subtle, #9fadbc); }
   .jda-status { color: var(--ds-text-subtlest, #9fadbc); }
   .jda-status[data-state="saved"] { color: var(--ds-text-success, #7ee2b8); }
   .jda-status[data-state="failed"] { color: var(--ds-text-danger, #ff9c8f); }

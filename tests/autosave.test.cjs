@@ -20,6 +20,67 @@ function setup(t, html = markup) {
   t.after(() => { clock.uninstall(); dom.window.close(); });
   return { w, q, clock, event, edit, tick, saves: () => saves, status: () => q('.jda-status')?.textContent };
 }
+test('warns after ten idle seconds and counts down for ten more before saving once', async t => {
+  const s = setup(t); s.edit();
+  await s.tick(9999); assert.equal(s.q('.jda-countdown').hidden, true);
+  await s.tick(1); assert.equal(s.q('.jda-countdown').hidden, false);
+  assert.match(s.q('.jda-countdown').textContent, /Autosave in 10s/);
+  await s.tick(9000); assert.match(s.q('.jda-countdown').textContent, /Autosave in 1s/);
+  assert.equal(s.saves(), 0);
+  await s.tick(1000); assert.equal(s.saves(), 1); assert.equal(s.q('.jda-countdown').hidden, true);
+});
+test('typing and cursor keys dismiss the countdown and restart the idle period', async t => {
+  const s = setup(t); s.edit(); await s.tick(15000);
+  s.edit(); assert.equal(s.q('.jda-countdown').hidden, true);
+  await s.tick(10000); assert.equal(s.q('.jda-countdown').hidden, false);
+  s.q('[contenteditable]').dispatchEvent(new s.w.KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }));
+  assert.equal(s.q('.jda-countdown').hidden, true);
+  await s.tick(19999); assert.equal(s.saves(), 0);
+  await s.tick(1); assert.equal(s.saves(), 1);
+});
+test('countdown Cancel keeps changes and uses thirty idle seconds for the rest of the edit', async t => {
+  const s = setup(t); s.edit(); await s.tick(19999);
+  s.q('.jda-countdown button').focus(); assert.equal(s.saves(), 0);
+  s.q('.jda-countdown button').click();
+  assert.equal(s.q('.jda-countdown').hidden, true);
+  assert.equal(s.w.document.activeElement, s.q('[contenteditable]'));
+  await s.tick(29999); assert.equal(s.q('.jda-countdown').hidden, true); assert.equal(s.saves(), 0);
+  await s.tick(1); assert.match(s.q('.jda-countdown').textContent, /Autosave in 10s/);
+  s.edit(); await s.tick(29999); assert.equal(s.q('.jda-countdown').hidden, true);
+  await s.tick(10001); assert.equal(s.saves(), 1);
+});
+test('countdown Cancel pointerdown wins a race with expiry without invoking Jira Cancel', async t => {
+  const s = setup(t); let cancelled = 0;
+  s.q('#cancel').addEventListener('click', () => cancelled++);
+  s.edit(); await s.tick(19999);
+  s.q('.jda-countdown button').dispatchEvent(new s.w.MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 }));
+  s.w.document.body.click(); // Browser retargets the release after the notice hides.
+  await s.tick(1000); assert.equal(s.saves(), 0); assert.equal(cancelled, 0);
+  assert.equal(s.q('.jda-countdown').hidden, true);
+  s.event(s.q('#away'), 'pointerdown'); assert.equal(s.saves(), 1);
+});
+test('manual save, native Cancel, composition and navigation clear active countdowns', async t => {
+  for (const action of ['save', 'cancel', 'composition', 'navigate', 'remove']) {
+    const s = setup(t); s.edit(); await s.tick(10000);
+    if (action === 'save' || action === 'cancel') s.q(`#${action}`).click();
+    if (action === 'composition') s.event(s.q('[contenteditable]'), 'compositionstart');
+    if (action === 'navigate') {
+      s.w.history.pushState({}, '', '/browse/TEST-2');
+      s.w.dispatchEvent(new s.w.PopStateEvent('popstate'));
+    }
+    if (action === 'remove') s.q('section').remove();
+    await s.tick(30000);
+    assert.ok(!s.q('.jda-countdown') || s.q('.jda-countdown').hidden, action);
+    assert.equal(s.saves(), action === 'save' ? 1 : 0, action);
+  }
+});
+test('a formatting popup opened during the countdown postpones the save', async t => {
+  const s = setup(t); s.edit(); await s.tick(15000);
+  const dialog = s.w.document.createElement('div'); dialog.setAttribute('role', 'dialog');
+  s.w.document.body.append(dialog); await s.tick(10000);
+  assert.equal(s.saves(), 0); assert.equal(s.q('.jda-countdown').hidden, true);
+  dialog.remove(); await s.tick(21000); assert.equal(s.saves(), 1);
+});
 test('debounces actual input; opening and unrelated DOM changes do not save', async t => {
   const s = setup(t);
   await s.tick(5000); assert.equal(s.saves(), 0);
@@ -27,21 +88,21 @@ test('debounces actual input; opening and unrelated DOM changes do not save', as
   s.q('[contenteditable]').setAttribute('aria-label', 'Description');
   await s.tick(2000); assert.equal(s.saves(), 0);
   s.edit(); assert.equal(s.status(), 'Unsaved changes…');
-  await s.tick(1000); s.edit(); await s.tick(1499); assert.equal(s.saves(), 0);
+  await s.tick(1000); s.edit(); await s.tick(19999); assert.equal(s.saves(), 0);
   await s.tick(1); assert.equal(s.saves(), 1); assert.equal(s.status(), 'Saving…');
   await s.tick(3000); assert.equal(s.saves(), 1);
 });
 test('only announces Saved after editor closes in the same field and route', async t => {
-  const s = setup(t); s.edit(); await s.tick(1500);
+  const s = setup(t); s.edit(); await s.tick(20000);
   s.q('section').innerHTML = '<h2>Description</h2><div>Rendered by Jira</div>';
   await s.tick(249); assert.equal(s.status(), 'Saving…');
   await s.tick(1); assert.equal(s.status(), 'Saved');
   await s.tick(1800); assert.equal(s.q('.jda-status'), null);
-  s.q('section').outerHTML = markup; await s.tick(0); s.edit(); await s.tick(1500);
+  s.q('section').outerHTML = markup; await s.tick(0); s.edit(); await s.tick(20000);
   assert.equal(s.status(), 'Saving…');
 });
 test('Cancel on pointerdown cancels even when debounce would fire before click', async t => {
-  const s = setup(t); s.edit(); await s.tick(1490);
+  const s = setup(t); s.edit(); await s.tick(19990);
   s.event(s.q('#cancel'), 'pointerdown'); await s.tick(1000);
   s.q('#cancel').click(); await s.tick(5000); assert.equal(s.saves(), 0);
   assert.equal(s.q('.jda-status'), null);
@@ -70,12 +131,12 @@ test('toolbar and portalled formatting dialog suspend idle saves', async t => {
   dialog.innerHTML = '<input aria-label="Link URL">'; s.w.document.body.append(dialog);
   s.q('#bold').click(); s.event(dialog.querySelector('input'), 'focusin');
   await s.tick(5000); assert.equal(s.saves(), 0);
-  dialog.remove(); await s.tick(1500); assert.equal(s.saves(), 1);
+  dialog.remove(); await s.tick(20000); assert.equal(s.saves(), 1);
 });
 test('format-only user mutations save without serializing contents', async t => {
   const s = setup(t); s.event(s.q('#bold'), 'pointerdown'); s.q('#bold').click();
   const p = s.q('[contenteditable] p'); const strong = s.w.document.createElement('strong');
-  p.replaceWith(strong); await s.tick(1500); assert.equal(s.saves(), 1);
+  p.replaceWith(strong); await s.tick(20000); assert.equal(s.saves(), 1);
 });
 test('selection and decoration attributes after keyboard activity are ignored', async t => {
   const s = setup(t);
@@ -86,32 +147,32 @@ test('selection and decoration attributes after keyboard activity are ignored', 
 test('IME composition cannot be interrupted by autosave', async t => {
   const s = setup(t); s.event(s.q('[contenteditable]'), 'compositionstart'); s.edit();
   await s.tick(3000); assert.equal(s.saves(), 0);
-  s.event(s.q('[contenteditable]'), 'compositionend'); await s.tick(1500); assert.equal(s.saves(), 1);
+  s.event(s.q('[contenteditable]'), 'compositionend'); await s.tick(20000); assert.equal(s.saves(), 1);
 });
 test('timeout fails once; only subsequent edit retries', async t => {
-  const s = setup(t); s.edit(); await s.tick(11500);
+  const s = setup(t); s.edit(); await s.tick(30000);
   assert.equal(s.status(), 'Save failed'); await s.tick(30000); assert.equal(s.saves(), 1);
   s.event(s.q('#away'), 'pointerdown'); assert.equal(s.saves(), 1);
-  s.edit(); await s.tick(1500); assert.equal(s.saves(), 2);
+  s.edit(); await s.tick(20000); assert.equal(s.saves(), 2);
 });
 test('new Jira error fails the save without retry', async t => {
-  const s = setup(t); s.edit(); await s.tick(1500);
+  const s = setup(t); s.edit(); await s.tick(20000);
   const error = s.w.document.createElement('div'); error.setAttribute('role', 'alert'); error.textContent = 'Cannot save';
   s.w.document.body.append(error); await s.tick(100);
   assert.equal(s.status(), 'Save failed'); await s.tick(30000); assert.equal(s.saves(), 1);
 });
 test('edits during flight never launch a concurrent save or get called saved', async t => {
-  const s = setup(t); s.edit(); await s.tick(1500); s.edit(); await s.tick(2000);
+  const s = setup(t); s.edit(); await s.tick(20000); s.edit(); await s.tick(2000);
   assert.equal(s.saves(), 1);
   s.q('section').innerHTML = '<h2>Description</h2><div>Rendered</div>';
   await s.tick(250); assert.equal(s.status(), 'Save failed');
 });
 test('route changes and root removal are not save completion', async t => {
-  const s = setup(t); s.edit(); await s.tick(1500);
+  const s = setup(t); s.edit(); await s.tick(20000);
   s.w.history.pushState({}, '', '/browse/TEST-2'); s.q('section').remove(); await s.tick(500);
   assert.equal(s.q('.jda-status'), null); assert.equal(s.saves(), 1);
   s.w.document.body.insertAdjacentHTML('afterbegin', markup); await s.tick(0);
-  s.edit(); await s.tick(1500); assert.equal(s.status(), 'Saving…');
+  s.edit(); await s.tick(20000); assert.equal(s.status(), 'Saving…');
 });
 test('ambiguous editors and unrelated Save buttons are never clicked', async t => {
   const s = setup(t, `<div><div role="textbox" contenteditable="true"></div><button id="other">Save</button></div>${markup.replace('<button id="save">', '<button>Save</button><button id="save">')}`);
@@ -123,17 +184,17 @@ test('comment editors and generic Description headings are not candidates', asyn
   s.edit(); await s.tick(3000); assert.equal(s.saves(), 0); assert.equal(s.q('.jda-status'), null);
 });
 test('disabled Save fails safely and does not poll or retry', async t => {
-  const s = setup(t); s.edit(); s.q('#save').disabled = true; await s.tick(1500);
+  const s = setup(t); s.edit(); s.q('#save').disabled = true; await s.tick(20000);
   assert.equal(s.status(), 'Save failed'); s.q('#save').disabled = false;
   await s.tick(30000); assert.equal(s.saves(), 0);
 });
 test('re-executing the content script does not duplicate listeners', async t => {
-  const s = setup(t); s.w.eval(source); s.edit(); await s.tick(1500);
+  const s = setup(t); s.w.eval(source); s.edit(); await s.tick(20000);
   assert.equal(s.saves(), 1); assert.equal(s.w.document.querySelectorAll('.jda-status').length, 1);
 });
 test('live Jira heading identifies edit-mode wrapper and permits hidden attachment input', async t => {
   const live = `<div><div><h2 data-testid="issue.views.issue-base.common.description.label">Description</h2></div><div data-testid="issue.views.field.rich-text.editor-container"><div data-testid="issue.component.editor.default-editor"><input type="file" hidden><div role="textbox" contenteditable="true" aria-label="Description area, start typing to enter text."></div><button id="save" data-testid="comment-save-button">Save</button><button id="cancel" data-testid="comment-cancel-button">Cancel</button></div></div></div>`;
-  const s = setup(t, live); s.edit(); await s.tick(1500); assert.equal(s.saves(), 1);
+  const s = setup(t, live); s.edit(); await s.tick(20000); assert.equal(s.saves(), 1);
   s.q('[data-testid="issue.views.field.rich-text.editor-container"]').outerHTML = '<div data-testid="issue.views.field.rich-text.description">Rendered view</div>';
   await s.tick(250); assert.equal(s.status(), 'Saved');
 });
@@ -144,7 +205,7 @@ test('Description heading cannot match an adjacent custom field editor', async t
 test('empty Jira popup portal does not suspend autosave', async t => {
   const s = setup(t); const portal = s.w.document.createElement('div'); portal.dataset.editorPopup = 'true';
   portal.getClientRects = () => [{ width: 0, height: 0 }]; s.w.document.body.append(portal);
-  s.edit(); await s.tick(1500); assert.equal(s.saves(), 1);
+  s.edit(); await s.tick(20000); assert.equal(s.saves(), 1);
 });
 test('selection-only cursor and pointer activity cannot arm mutation saves', async t => {
   const s = setup(t);
@@ -158,7 +219,7 @@ test('buttons embedded in Description content are not read or mistaken for contr
   const s = setup(t);
   const embedded = s.w.document.createElement('span'); embedded.setAttribute('role', 'button');
   Object.defineProperty(embedded, 'textContent', { get() { throw new Error('Description content must not be read'); } });
-  s.q('[contenteditable]').append(embedded); s.edit(); await s.tick(1500); assert.equal(s.saves(), 1);
+  s.q('[contenteditable]').append(embedded); s.edit(); await s.tick(20000); assert.equal(s.saves(), 1);
 });
 test('manual save teardown is not mistaken for edits made during the save', async t => {
   const s = setup(t);

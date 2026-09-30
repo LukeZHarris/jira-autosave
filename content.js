@@ -4,7 +4,7 @@
   if (globalThis.__jiraDescriptionAutosave) return;
   globalThis.__jiraDescriptionAutosave = true;
 
-  const CONFIG = Object.freeze({ idleMs: 1500, timeoutMs: 10000, savedMs: 1800, settleMs: 250 });
+  const CONFIG = Object.freeze({ idleMs: 10000, countdownMs: 10000, deferredIdleMs: 30000, timeoutMs: 10000, savedMs: 1800, settleMs: 250 });
   // Jira DOM is not a public contract. Keep exact field identifiers here. Never
   // broaden discovery to arbitrary textboxes, headings, or page-wide Save buttons.
   const SELECTORS = Object.freeze({
@@ -60,6 +60,7 @@
       this.failed = false;
       this.composing = false;
       this.intentUntil = 0;
+      this.idleMs = CONFIG.idleMs;
       this.abort = new AbortController();
       this.status = document.createElement('span');
       this.status.className = 'jda-status';
@@ -68,10 +69,40 @@
       this.status.hidden = true;
       // Sibling of the field: survives Jira replacing the editor's children.
       root.after(this.status);
+      this.notice = document.createElement('div');
+      this.notice.className = 'jda-countdown';
+      this.notice.setAttribute('role', 'group');
+      this.notice.setAttribute('aria-label', 'Description autosave');
+      // Manual popovers escape Jira's scrolling containers and dialog layers.
+      // Unlike a modal dialog, opening this never takes keyboard focus.
+      this.notice.setAttribute('popover', 'manual');
+      this.notice.hidden = true;
+      this.countdownLabel = document.createElement('span');
+      this.countdownLabel.setAttribute('role', 'status');
+      this.deferButton = document.createElement('button');
+      this.deferButton.type = 'button';
+      this.deferButton.textContent = 'Keep editing';
+      this.deferButton.title = 'Keep editing; wait 30 seconds before the next countdown';
+      const hint = document.createElement('small');
+      hint.textContent = 'Remind me after 30 seconds';
+      this.notice.append(this.countdownLabel, this.deferButton, hint);
+      this.status.after(this.notice);
       const listen = (target, name, fn, capture = false) => target.addEventListener(name, fn, { capture, signal: this.abort.signal });
+      listen(document, 'selectionchange', () => this.rememberCaret());
+      listen(document, 'scroll', () => this.positionNotice(), true);
+      listen(window, 'resize', () => this.positionNotice());
+      if (window.visualViewport) {
+        listen(window.visualViewport, 'resize', () => this.positionNotice());
+        listen(window.visualViewport, 'scroll', () => this.positionNotice());
+      }
+      // Act on pointerdown too, so a press just before zero cannot lose to Save.
+      listen(this.deferButton, 'pointerdown', event => {
+        if (event.button === 0) { event.preventDefault(); this.defer(); }
+      });
+      listen(this.deferButton, 'click', () => this.defer());
       listen(this.editor, 'input', () => this.changed());
       listen(this.editor, 'beforeinput', () => { this.intentUntil = Date.now() + 750; });
-      listen(this.editor, 'compositionstart', () => { this.composing = true; clearTimeout(this.timer); });
+      listen(this.editor, 'compositionstart', () => { this.composing = true; this.clearSchedule(); });
       listen(this.editor, 'compositionend', () => { this.composing = false; this.schedule(); });
       listen(root, 'keydown', event => {
         const shortcut = event.ctrlKey || event.metaKey;
@@ -79,11 +110,13 @@
             ['Backspace', 'Delete', 'Enter'].includes(event.key) ||
             (shortcut && ['b', 'i', 'u', 'z', 'y', 'x', 'v'].includes(event.key.toLowerCase()))) this.intentUntil = Date.now() + 750;
         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !event.isComposing) this.beginSave();
+        // Leave Tab navigation intact so the countdown's Cancel stays reachable.
+        else if (this.editor.contains(event.target) && !['Tab', 'Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) this.schedule();
       }, true);
       listen(document, 'pointerdown', event => this.pointer(event), true);
       listen(document, 'click', event => this.click(event), true);
       listen(document, 'focusin', event => {
-        if (!root.contains(event.target) && !overlayOpen(root)) this.save();
+        if (!root.contains(event.target) && !this.notice.contains(event.target) && !overlayOpen(root)) this.save();
       }, true);
       listen(window, 'pagehide', () => this.save());
       // Navigation API gives an early chance without intercepting Jira's router.
@@ -107,12 +140,83 @@
       this.schedule();
     }
     schedule() {
-      clearTimeout(this.timer);
+      this.clearSchedule();
       if (this.dirty && !this.saving && !this.failed && !this.composing) {
-        this.timer = setTimeout(() => this.save(), CONFIG.idleMs);
+        this.timer = setTimeout(() => this.startCountdown(), this.idleMs);
       }
     }
+    clearSchedule() {
+      clearTimeout(this.timer);
+      clearTimeout(this.countdownTimer);
+      this.notice.hidePopover?.();
+      this.notice.hidden = true;
+    }
+    startCountdown() {
+      if (!this.root.isConnected || location.href !== this.url || !visible(this.editor)) return;
+      if (overlayOpen(this.root)) { this.schedule(); return; }
+      this.countdownEnds = Date.now() + CONFIG.countdownMs;
+      this.rememberCaret();
+      this.notice.hidden = false;
+      this.notice.showPopover?.();
+      this.updateCountdown();
+    }
+    updateCountdown() {
+      if (!this.root.isConnected || location.href !== this.url || !visible(this.editor)) { this.clearSchedule(); return; }
+      if (overlayOpen(this.root)) { this.schedule(); return; }
+      const remaining = Math.ceil((this.countdownEnds - Date.now()) / 1000);
+      if (remaining <= 0) { this.clearSchedule(); this.save(); return; }
+      this.countdownLabel.textContent = `Autosave in ${remaining}s`;
+      this.positionNotice();
+      this.countdownTimer = setTimeout(() => this.updateCountdown(), 1000);
+    }
+    rememberCaret() {
+      const selection = document.getSelection();
+      if (!selection?.focusNode || !this.editor.contains(selection.focusNode)) return;
+      // Geometry only: never inspect text or insert a marker into Jira's editor.
+      this.caret = document.createRange();
+      this.caret.setStart(selection.focusNode, selection.focusOffset);
+      this.caret.collapse(true);
+      this.positionNotice();
+    }
+    positionNotice() {
+      if (this.notice.hidden) return;
+      const viewport = window.visualViewport;
+      const left = viewport?.offsetLeft || 0;
+      const top = viewport?.offsetTop || 0;
+      const width = viewport?.width || window.innerWidth;
+      const height = viewport?.height || window.innerHeight;
+      const margin = 12;
+      this.notice.style.maxWidth = `${Math.max(0, width - margin * 2)}px`;
+      this.notice.style.maxHeight = `${Math.max(0, height - margin * 2)}px`;
+      const box = this.notice.getBoundingClientRect();
+      const right = left + width - margin - box.width;
+      const bottom = top + height - margin - box.height;
+      let x = left + (width - box.width) / 2;
+      let y = top + (height - box.height) / 2;
+      const caret = this.caret && this.editor.contains(this.caret.startContainer) && this.caret.getBoundingClientRect?.();
+      // The newly opened card may initially cover the caret. Exclude our own
+      // surface from hit testing, while still detecting Jira's clipped content.
+      this.notice.style.pointerEvents = 'none';
+      const caretVisible = caret?.height > 0 && this.editor.contains(document.elementFromPoint(caret.left, caret.top + caret.height / 2));
+      this.notice.style.pointerEvents = '';
+      if (caret?.height > 0 && caret.left >= left && caret.right < left + width &&
+          caret.top >= top && caret.bottom <= top + height && caretVisible) {
+        x = caret.left;
+        y = caret.bottom + margin;
+        if (y > bottom) y = caret.top - margin - box.height;
+      }
+      this.notice.style.left = `${Math.max(left + margin, Math.min(x, right))}px`;
+      this.notice.style.top = `${Math.max(top + margin, Math.min(y, bottom))}px`;
+    }
+    defer() {
+      const restoreFocus = this.notice.contains(document.activeElement);
+      this.idleMs = CONFIG.deferredIdleMs;
+      this.schedule();
+      if (restoreFocus && this.editor.isConnected) this.editor.focus({ preventScroll: true });
+    }
     pointer(event) {
+      this.noticePointer = this.notice.contains(event.target);
+      if (this.noticePointer) return;
       const pair = controls(this.root);
       if (!pair) return;
       if (pair.cancel.contains(event.target)) { this.cancel(); return; }
@@ -120,13 +224,17 @@
         // Pause while selecting formatting controls (including portalled UI).
         if (!this.editor.contains(event.target)) {
           this.intentUntil = Date.now() + 750;
-          clearTimeout(this.timer);
+          this.clearSchedule();
         }
         return;
       }
       if (!event.target.closest(SELECTORS.overlay) && !overlayOpen(this.root)) this.save();
     }
     click(event) {
+      // Hiding Cancel on pointerdown can retarget the eventual click to the
+      // page underneath. It still belongs to the countdown, not a departure.
+      if (this.noticePointer) { this.noticePointer = false; return; }
+      if (this.notice.contains(event.target)) return;
       const pair = controls(this.root);
       if (!pair) return;
       if (pair.cancel.contains(event.target)) { this.cancel(); return; }
@@ -143,7 +251,7 @@
     }
     beginSave() {
       if (this.saving || !this.dirty) return;
-      clearTimeout(this.timer);
+      this.clearSchedule();
       // Jira dismantles editor content during Save. End the preceding edit's
       // mutation window so teardown is not mistaken for newer user input.
       this.observer.takeRecords();
@@ -169,7 +277,7 @@
       pair.save.click();
     }
     fail() {
-      clearTimeout(this.timer);
+      this.clearSchedule();
       clearTimeout(this.deadline);
       clearTimeout(this.completion);
       this.completion = null;
@@ -214,10 +322,12 @@
       }
     }
     destroy() {
+      this.clearSchedule();
       for (const timer of [this.timer, this.deadline, this.hideTimer, this.completion]) clearTimeout(timer);
       this.abort.abort();
       this.observer.disconnect();
       this.status.remove();
+      this.notice.remove();
     }
   }
 
@@ -251,7 +361,7 @@
   let queued = false;
   const lifecycle = new MutationObserver(records => {
     // Do not observe our own status changes as Jira lifecycle events.
-    if (records.every(record => record.target.nodeType === Node.ELEMENT_NODE && record.target.closest('.jda-status'))) return;
+    if (records.every(record => record.target.nodeType === Node.ELEMENT_NODE && record.target.closest('.jda-status, .jda-countdown'))) return;
     if (!queued) {
       queued = true;
       queueMicrotask(() => { queued = false; reconcile(); });
